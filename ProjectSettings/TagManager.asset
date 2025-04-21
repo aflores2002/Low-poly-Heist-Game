@@ -9,6 +9,7 @@ TagManager:
   - Concrete
   - Metal
   - ExplosiveBarrel
+  - Interactable
   layers:
   - Default
   - TransparentFX
