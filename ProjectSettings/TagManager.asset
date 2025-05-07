@@ -10,6 +10,7 @@ TagManager:
   - Metal
   - ExplosiveBarrel
   - Interactable
+  - Cop
   layers:
   - Default
   - TransparentFX

@@ -6,6 +6,14 @@ public class Interactable : MonoBehaviour
 
     public virtual void Interact()
     {
-        Destroy(gameObject); // This simulates stealing the item
+        // Notify the cop
+        CopPatrol cop = GameObject.FindWithTag("Cop")?.GetComponent<CopPatrol>();
+        if (cop != null)
+        {
+            cop.AlertCop();
+        }
+
+        // Simulate stealing
+        Destroy(gameObject);
     }
 }
