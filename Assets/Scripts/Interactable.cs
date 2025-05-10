@@ -6,14 +6,19 @@ public class Interactable : MonoBehaviour
 
     public virtual void Interact()
     {
-        // Notify the cop
         CopPatrol cop = GameObject.FindWithTag("Cop")?.GetComponent<CopPatrol>();
         if (cop != null)
         {
-            cop.AlertCop();
+            cop.AlertCop(); // Optional if you want suspicion only when spotted
         }
 
-        // Simulate stealing
-        Destroy(gameObject);
+        JewelrySpot spot = GetComponentInParent<JewelrySpot>();
+        if (spot != null)
+        {
+            spot.MarkAsStolen(); // Tell the anchor the item is gone
+        }
+
+        Destroy(gameObject); // Simulate theft
     }
 }
+
