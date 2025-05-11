@@ -16,7 +16,7 @@ public class CashierAI : MonoBehaviour {
 
         hasPanicked = true;
         audioSource.PlayOneShot(panicClip);
-        animator.SetTrigger("Panic"); // make sure your Animator has a "Panic" trigger
+        animator.SetTrigger("panic"); // make sure your Animator has a "Panic" trigger
         // Optional: Disable movement or other scripts
     }
 }

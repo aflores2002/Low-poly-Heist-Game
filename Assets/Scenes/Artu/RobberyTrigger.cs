@@ -1,14 +1,13 @@
 using UnityEngine;
 public class RobberyTrigger : MonoBehaviour {
     private bool robberyStarted = false;
-    private bool Panic = false;
 
     void OnTriggerEnter(Collider other) {
         if (robberyStarted) return;
 
         if (other.CompareTag("Player")) {
             robberyStarted = true;
-            Panic = true;
+            //panic = true;
             TriggerPanicBehaviors();
         }
     }
