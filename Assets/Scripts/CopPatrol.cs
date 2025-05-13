@@ -3,6 +3,7 @@ using UnityEngine.AI;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 public class CopPatrol : MonoBehaviour
 {
@@ -368,6 +369,16 @@ public class CopPatrol : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawSphere(lastKnownPlayerPosition, 0.3f);
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (currentState == CopState.Chasing && other.CompareTag("Player"))
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            SceneManager.LoadScene("CaughtScene"); 
+        }
     }
 }
 
