@@ -6,6 +6,10 @@ public class PlayerMoney : MonoBehaviour
     public int currentMoney = 0;
     public TextMeshProUGUI moneyText;
 
+    [Header("Money Pop-Up")]
+    public GameObject moneyPopupPrefab;
+    public Transform popupParent;
+
     private void Start()
     {
         UpdateMoneyUI();
@@ -15,6 +19,14 @@ public class PlayerMoney : MonoBehaviour
     {
         currentMoney += amount;
         UpdateMoneyUI();
+
+        // Show floating text
+        if (moneyPopupPrefab != null && popupParent != null)
+        {
+            GameObject popup = Instantiate(moneyPopupPrefab, popupParent);
+            popup.transform.localPosition = Vector3.zero; // center in parent
+            popup.GetComponent<MoneyPopup>().SetAmount(amount);
+        }
     }
 
     private void UpdateMoneyUI()
