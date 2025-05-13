@@ -164,6 +164,8 @@ public class CopPatrol : MonoBehaviour
 
         agent.isStopped = true;
         animator.SetFloat(SpeedHash, 0f);
+        animator.SetBool("IsLookingAround", true); // Start looking animation
+
 
         float searchTime = 3f;
         float timer = 0f;
@@ -180,6 +182,7 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
+        animator.SetBool("IsLookingAround", false); // Stop looking
         isSearchingForPlayer = false;
         currentState = CopState.Patrol;
         animator.SetBool(ChasingHash, false);
@@ -209,6 +212,7 @@ public class CopPatrol : MonoBehaviour
         currentState = CopState.Investigating;
         isInvestigating = true;
 
+
         Vector3 destination = targetPosition;
         if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 2f, NavMesh.AllAreas))
         {
@@ -237,7 +241,7 @@ public class CopPatrol : MonoBehaviour
         }
 
         agent.isStopped = true;
-        animator.SetFloat(SpeedHash, 0f);
+        animator.SetBool("IsLookingAround", true);
 
         float timer = 0f;
         while (timer < investigateWaitTime)
@@ -253,10 +257,13 @@ public class CopPatrol : MonoBehaviour
         }
 
         AlertCop();
+        animator.SetBool("IsLookingAround", false);
+
         isInvestigating = false;
         agent.isStopped = false;
-        GoToNextPatrol();
+ 
         currentState = CopState.Patrol;
+        GoToNextPatrol();
     }
 
     void PatrolLogic()
