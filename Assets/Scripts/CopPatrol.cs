@@ -384,7 +384,15 @@ public class CopPatrol : MonoBehaviour
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            SceneManager.LoadScene("CaughtScene"); 
+            SceneManager.LoadScene("CaughtScene");
+
+            PlayerMoney playerMoney = FindObjectOfType<PlayerMoney>();
+            if (playerMoney != null)
+            {
+                PlayerPrefs.SetInt("StolenAmount", playerMoney.currentMoney);
+                PlayerPrefs.Save(); // Optional but ensures it writes immediately
+            }
+
         }
     }
 }
