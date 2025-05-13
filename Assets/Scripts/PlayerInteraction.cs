@@ -27,7 +27,7 @@ public class PlayerInteraction : MonoBehaviour
 
                 if (Input.GetKeyDown(KeyCode.E))
                 {
-                    currentInteractable.Interact();
+                    currentInteractable.Interact(gameObject); // Pass the player object
                     interactionPromptUI.SetActive(false);
                 }
 
