@@ -21,11 +21,12 @@ public class CivilianWander : MonoBehaviour {
     }
 
     void ChooseNextDestination() {
-        if (waypoints.Length == 0) return;
+    if (waypoints.Length == 0) return;
 
-        currentTarget = Random.Range(0, waypoints.Length);
-        agent.SetDestination(waypoints[currentTarget].position);
-    }
+    currentTarget = (currentTarget + 1) % waypoints.Length;
+    agent.SetDestination(waypoints[currentTarget].position);
+}
+
 
     public void TriggerFlee(Transform fleeTarget) {
         isFleeing = true;
