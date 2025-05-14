@@ -42,6 +42,12 @@ public class CopPatrol : MonoBehaviour
     public float investigateWaitTime = 2f;
     public LayerMask stolenObjectMask;
 
+    [Header("Audio")]
+    public AudioSource audioSource;
+    public AudioClip walkClip;
+    public AudioClip runClip;
+
+
     private float suspicionLevel = 0f;
     private bool hasEscalated = false;
     private bool isInvestigating = false;
@@ -141,8 +147,33 @@ public class CopPatrol : MonoBehaviour
                     PatrolLogic();
                 }
                 break;
+
+                UpdateFootstepAudio();
         }
     }
+
+    void UpdateFootstepAudio()
+    {
+        float speed = agent.velocity.magnitude;
+        bool isMoving = !agent.isStopped && speed > 0.1f;
+
+        if (!isMoving || isHit || !animator.GetBool("CanMove"))
+        {
+            if (audioSource.isPlaying)
+                audioSource.Stop();
+            return;
+        }
+
+        AudioClip targetClip = currentState == CopState.Chasing ? runClip : walkClip;
+
+        if (audioSource.clip != targetClip)
+        {
+            audioSource.clip = targetClip;
+            audioSource.loop = true;
+            audioSource.Play();
+        }
+    }
+
 
     void StopAgent()
     {
@@ -181,6 +212,10 @@ public class CopPatrol : MonoBehaviour
 
     void StartChase()
     {
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+        {
+            agent.Warp(hit.position);
+        }
         currentState = CopState.Chasing;
         lastSeenTime = Time.time;
         animator.SetBool(ChasingHash, true);
