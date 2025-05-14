@@ -447,6 +447,9 @@ public class CopPatrol : MonoBehaviour
         StopAgent();
         agent.enabled = false;
 
+        animator.applyRootMotion = false; // Disable root motion for knockdown
+
+
         animator.SetBool("CanMove", false);
         animator.SetTrigger("IsHit");
 
