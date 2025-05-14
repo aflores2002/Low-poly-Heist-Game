@@ -170,8 +170,14 @@ public class CopPatrol : MonoBehaviour
 
     bool ShouldChasePlayer()
     {
+        // If max suspicion, chase no matter what
+        if (suspicionLevel >= suspicionThreshold)
+            return true;
+
+        // Otherwise, only chase if suspicion exists AND player is visible
         return suspicionLevel > 0 && CanSeePlayer();
     }
+
 
     void StartChase()
     {
@@ -452,7 +458,7 @@ public class CopPatrol : MonoBehaviour
 
         animator.SetTrigger("IsGettingUp");
 
-        yield return new WaitForSeconds(2f); // Getting up animation
+        yield return new WaitForSeconds(1f); // Getting up animation
 
         agent.enabled = true;
 
@@ -464,35 +470,12 @@ public class CopPatrol : MonoBehaviour
         animator.SetBool("CanMove", true);
         isHit = false;
 
-        if (ShouldChasePlayer())
-        {
-            StartChase();
-        }
-        else
-        {
-            ResumePatrol(); 
-        }
+        
+        StartChase();
+       
 
     }
 
-    void ResumePatrol()
-    {
-        if (patrolPoints.Length == 0) return;
-
-        // Force move to the next patrol point
-        currentPoint = (currentPoint + 1) % patrolPoints.Length;
-        agent.speed = patrolSpeed;
-        agent.isStopped = false;
-
-        if (agent.enabled && agent.isOnNavMesh)
-        {
-            Vector3 target = patrolPoints[currentPoint].position;
-            agent.SetDestination(target);
-            Debug.Log("Resuming patrol to next point: " + target);
-        }
-
-        currentState = CopState.Patrol;
-        animator.SetBool(ChasingHash, false);
-    }
+    
 
 }
