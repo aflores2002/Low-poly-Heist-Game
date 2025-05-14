@@ -48,6 +48,7 @@ public class CopPatrol : MonoBehaviour
     private float lastSeenTime = 0f;
     private Vector3 lastKnownPlayerPosition;
     private bool isSearchingForPlayer = false;
+    private bool isHit = false;
 
     private float viewRadius;
     private float viewAngle;
@@ -57,6 +58,7 @@ public class CopPatrol : MonoBehaviour
 
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
     private static readonly int ChasingHash = Animator.StringToHash("Chasing");
+    private static readonly int LookingHash = Animator.StringToHash("IsLookingAround");
 
     private enum CopState { Patrol, Investigating, Chasing }
     private CopState currentState = CopState.Patrol;
@@ -80,6 +82,26 @@ public class CopPatrol : MonoBehaviour
 
     void Update()
     {
+        if (isHit)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            return;
+        }
+
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        bool isBlockedState = stateInfo.IsName("Dying") || stateInfo.IsName("GettingUp");
+
+        if (isBlockedState)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+        else
+        {
+            agent.isStopped = false;
+        }
+
         UpdateSuspicionView();
         UpdateUI();
 
@@ -88,10 +110,8 @@ public class CopPatrol : MonoBehaviour
             case CopState.Chasing:
                 HandleChase();
                 break;
-
             case CopState.Investigating:
                 break;
-
             case CopState.Patrol:
                 if (ShouldChasePlayer())
                 {
@@ -125,7 +145,9 @@ public class CopPatrol : MonoBehaviour
         currentState = CopState.Chasing;
         lastSeenTime = Time.time;
         animator.SetBool(ChasingHash, true);
+        animator.SetBool(LookingHash, false);
         agent.speed = chaseSpeed;
+        agent.isStopped = false;
         lastKnownPlayerPosition = player.position;
     }
 
@@ -164,8 +186,7 @@ public class CopPatrol : MonoBehaviour
 
         agent.isStopped = true;
         animator.SetFloat(SpeedHash, 0f);
-        animator.SetBool("IsLookingAround", true); // Start looking animation
-
+        animator.SetBool(LookingHash, true);
 
         float searchTime = 3f;
         float timer = 0f;
@@ -175,6 +196,7 @@ public class CopPatrol : MonoBehaviour
             if (CanSeePlayer())
             {
                 isSearchingForPlayer = false;
+                animator.SetBool(LookingHash, false);
                 StartChase();
                 yield break;
             }
@@ -182,7 +204,7 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
-        animator.SetBool("IsLookingAround", false); // Stop looking
+        animator.SetBool(LookingHash, false);
         isSearchingForPlayer = false;
         currentState = CopState.Patrol;
         animator.SetBool(ChasingHash, false);
@@ -212,7 +234,6 @@ public class CopPatrol : MonoBehaviour
         currentState = CopState.Investigating;
         isInvestigating = true;
 
-
         Vector3 destination = targetPosition;
         if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 2f, NavMesh.AllAreas))
         {
@@ -241,7 +262,7 @@ public class CopPatrol : MonoBehaviour
         }
 
         agent.isStopped = true;
-        animator.SetBool("IsLookingAround", true);
+        animator.SetBool(LookingHash, true);
 
         float timer = 0f;
         while (timer < investigateWaitTime)
@@ -257,11 +278,10 @@ public class CopPatrol : MonoBehaviour
         }
 
         AlertCop();
-        animator.SetBool("IsLookingAround", false);
+        animator.SetBool(LookingHash, false);
 
         isInvestigating = false;
         agent.isStopped = false;
- 
         currentState = CopState.Patrol;
         GoToNextPatrol();
     }
@@ -298,6 +318,7 @@ public class CopPatrol : MonoBehaviour
         if (patrolPoints.Length == 0) return;
 
         agent.isStopped = false;
+        agent.speed = patrolSpeed;
         agent.SetDestination(patrolPoints[currentPoint].position);
     }
 
@@ -390,10 +411,52 @@ public class CopPatrol : MonoBehaviour
             if (playerMoney != null)
             {
                 PlayerPrefs.SetInt("StolenAmount", playerMoney.currentMoney);
-                PlayerPrefs.Save(); // Optional but ensures it writes immediately
+                PlayerPrefs.Save();
             }
-
         }
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        Debug.Log("Cop: Collision detected with " + collision.gameObject.name);
+        if (isHit) return;
+
+        if (collision.gameObject.CompareTag("Bullet"))
+        {
+            Debug.Log("Cop hit by bullet");
+            StartCoroutine(HandleKnockdown());
+        }
+    }
+
+    IEnumerator HandleKnockdown()
+    {
+        isHit = true;
+        currentState = CopState.Patrol;
+
+        agent.isStopped = true;
+        agent.velocity = Vector3.zero;
+        agent.enabled = false;
+
+        suspicionLevel = suspicionThreshold;
+        if (suspicionSlider != null)
+            suspicionSlider.value = suspicionLevel;
+
+        animator.SetTrigger("IsHit");
+
+        yield return new WaitForSeconds(5f);
+
+        animator.SetTrigger("IsGettingUp");
+
+        yield return new WaitForSeconds(2f);
+
+        agent.enabled = true;
+        agent.isStopped = false;
+        isHit = false;
+
+        if (ShouldChasePlayer())
+            StartChase();
+        else
+            GoToNextPatrol();
     }
 }
 

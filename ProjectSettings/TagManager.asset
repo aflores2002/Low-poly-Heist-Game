@@ -11,6 +11,7 @@ TagManager:
   - ExplosiveBarrel
   - Interactable
   - Cop
+  - Bullet
   layers:
   - Default
   - TransparentFX
