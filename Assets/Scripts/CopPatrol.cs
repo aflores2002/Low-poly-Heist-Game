@@ -77,6 +77,19 @@ public class CopPatrol : MonoBehaviour
         viewRadius = minViewRadius;
         viewAngle = minViewAngle;
 
+        currentState = CopState.Patrol;
+
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
+        {
+            agent.Warp(navHit.position);
+        }
+
+        agent.enabled = true;
+        agent.speed = patrolSpeed;
+        agent.isStopped = false;
+
+        animator.SetBool("CanMove", true); // allow movement from the beginning
+
         GoToNextPatrol();
     }
 
@@ -84,23 +97,26 @@ public class CopPatrol : MonoBehaviour
     {
         if (isHit)
         {
-            agent.isStopped = true;
-            agent.velocity = Vector3.zero;
+            StopAgent();
             return;
         }
 
+        // Animator-controlled movement
         AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-        bool isBlockedState = stateInfo.IsName("Dying") || stateInfo.IsName("GettingUp");
+        bool canMove = animator.GetBool("CanMove");
+        bool isBlocked = stateInfo.IsName("dying") || stateInfo.IsName("getting up");
 
-        if (isBlockedState)
+        if (canMove && !isBlocked && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+        }
+        else
         {
             agent.isStopped = true;
             agent.velocity = Vector3.zero;
         }
-        else
-        {
-            agent.isStopped = false;
-        }
+
+        animator.SetFloat(SpeedHash, agent.velocity.magnitude);
 
         UpdateSuspicionView();
         UpdateUI();
@@ -125,6 +141,23 @@ public class CopPatrol : MonoBehaviour
                     PatrolLogic();
                 }
                 break;
+        }
+    }
+
+    void StopAgent()
+    {
+        if (agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+    }
+
+    void ResumeAgent()
+    {
+        if (agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
         }
     }
 
@@ -164,14 +197,12 @@ public class CopPatrol : MonoBehaviour
             isSearchingForPlayer = true;
             StartCoroutine(InvestigateLastSeenPosition());
         }
-
-        animator.SetFloat(SpeedHash, agent.velocity.magnitude);
     }
 
     IEnumerator InvestigateLastSeenPosition()
     {
         agent.SetDestination(lastKnownPlayerPosition);
-        agent.isStopped = false;
+        ResumeAgent();
 
         while (Vector3.Distance(transform.position, lastKnownPlayerPosition) > 1.5f)
         {
@@ -184,7 +215,7 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
-        agent.isStopped = true;
+        StopAgent();
         animator.SetFloat(SpeedHash, 0f);
         animator.SetBool(LookingHash, true);
 
@@ -234,10 +265,9 @@ public class CopPatrol : MonoBehaviour
         currentState = CopState.Investigating;
         isInvestigating = true;
 
-        Vector3 destination = targetPosition;
         if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 2f, NavMesh.AllAreas))
         {
-            destination = hit.position;
+            agent.SetDestination(hit.position);
         }
         else
         {
@@ -247,10 +277,9 @@ public class CopPatrol : MonoBehaviour
             yield break;
         }
 
-        agent.SetDestination(destination);
-        agent.isStopped = false;
+        ResumeAgent();
 
-        while (Vector3.Distance(transform.position, destination) > 1.5f)
+        while (Vector3.Distance(transform.position, hit.position) > 1.5f)
         {
             if (ShouldChasePlayer())
             {
@@ -261,7 +290,7 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
-        agent.isStopped = true;
+        StopAgent();
         animator.SetBool(LookingHash, true);
 
         float timer = 0f;
@@ -281,7 +310,7 @@ public class CopPatrol : MonoBehaviour
         animator.SetBool(LookingHash, false);
 
         isInvestigating = false;
-        agent.isStopped = false;
+        ResumeAgent();
         currentState = CopState.Patrol;
         GoToNextPatrol();
     }
@@ -292,7 +321,6 @@ public class CopPatrol : MonoBehaviour
 
         agent.speed = patrolSpeed;
         animator.SetBool(ChasingHash, false);
-        animator.SetFloat(SpeedHash, agent.velocity.magnitude);
 
         if (!agent.pathPending && agent.remainingDistance < 0.3f)
         {
@@ -303,7 +331,7 @@ public class CopPatrol : MonoBehaviour
     IEnumerator WaitAtWaypoint()
     {
         isWaiting = true;
-        agent.isStopped = true;
+        StopAgent();
         animator.SetFloat(SpeedHash, 0f);
 
         yield return new WaitForSeconds(waitTimeAtWaypoint);
@@ -315,9 +343,9 @@ public class CopPatrol : MonoBehaviour
 
     void GoToNextPatrol()
     {
-        if (patrolPoints.Length == 0) return;
+        if (patrolPoints.Length == 0 || patrolPoints[currentPoint] == null) return;
 
-        agent.isStopped = false;
+        ResumeAgent();
         agent.speed = patrolSpeed;
         agent.SetDestination(patrolPoints[currentPoint].position);
     }
@@ -381,26 +409,15 @@ public class CopPatrol : MonoBehaviour
         }
     }
 
-    void OnDrawGizmosSelected()
-    {
-        if (player == null) return;
-
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, viewRadius);
-
-        Vector3 left = Quaternion.Euler(0, -viewAngle / 2f, 0) * transform.forward;
-        Vector3 right = Quaternion.Euler(0, viewAngle / 2f, 0) * transform.forward;
-
-        Gizmos.color = Color.blue;
-        Gizmos.DrawLine(transform.position, transform.position + left * viewRadius);
-        Gizmos.DrawLine(transform.position, transform.position + right * viewRadius);
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawSphere(lastKnownPlayerPosition, 0.3f);
-    }
-
     void OnTriggerEnter(Collider other)
     {
+        if (isHit) return;
+
+        if (other.CompareTag("Bullet"))
+        {
+            StartCoroutine(HandleKnockdown());
+        }
+
         if (currentState == CopState.Chasing && other.CompareTag("Player"))
         {
             Cursor.lockState = CursorLockMode.None;
@@ -416,47 +433,66 @@ public class CopPatrol : MonoBehaviour
         }
     }
 
-    void OnCollisionEnter(Collision collision)
-    {
-        Debug.Log("Cop: Collision detected with " + collision.gameObject.name);
-        if (isHit) return;
-
-        if (collision.gameObject.CompareTag("Bullet"))
-        {
-            Debug.Log("Cop hit by bullet");
-            StartCoroutine(HandleKnockdown());
-        }
-    }
-
     IEnumerator HandleKnockdown()
     {
         isHit = true;
         currentState = CopState.Patrol;
 
-        agent.isStopped = true;
-        agent.velocity = Vector3.zero;
+        StopAgent();
         agent.enabled = false;
+
+        animator.SetBool("CanMove", false);
+        animator.SetTrigger("IsHit");
 
         suspicionLevel = suspicionThreshold;
         if (suspicionSlider != null)
             suspicionSlider.value = suspicionLevel;
 
-        animator.SetTrigger("IsHit");
-
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(5f); // Dying animation
 
         animator.SetTrigger("IsGettingUp");
 
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(2f); // Getting up animation
 
         agent.enabled = true;
-        agent.isStopped = false;
+
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+        {
+            agent.Warp(hit.position);
+        }
+
+        animator.SetBool("CanMove", true);
         isHit = false;
 
         if (ShouldChasePlayer())
+        {
             StartChase();
+        }
         else
-            GoToNextPatrol();
-    }
-}
+        {
+            ResumePatrol(); 
+        }
 
+    }
+
+    void ResumePatrol()
+    {
+        if (patrolPoints.Length == 0) return;
+
+        // Force move to the next patrol point
+        currentPoint = (currentPoint + 1) % patrolPoints.Length;
+        agent.speed = patrolSpeed;
+        agent.isStopped = false;
+
+        if (agent.enabled && agent.isOnNavMesh)
+        {
+            Vector3 target = patrolPoints[currentPoint].position;
+            agent.SetDestination(target);
+            Debug.Log("Resuming patrol to next point: " + target);
+        }
+
+        currentState = CopState.Patrol;
+        animator.SetBool(ChasingHash, false);
+    }
+
+}
