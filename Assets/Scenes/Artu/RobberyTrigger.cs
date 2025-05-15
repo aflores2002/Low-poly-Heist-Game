@@ -7,6 +7,7 @@ public class RobberyTrigger : MonoBehaviour {
 
         if (other.CompareTag("Player")) {
             robberyStarted = true;
+            //panic = true;
             TriggerPanicBehaviors();
         }
     }
