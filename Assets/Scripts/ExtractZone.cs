@@ -20,6 +20,9 @@ public class ExtractZone : MonoBehaviour
                 PlayerPrefs.SetInt("FinalMoney", money.currentMoney);
             }
 
+            // Play car SFX
+            AudioManager.Instance?.PlayCarDriveOff();
+
             // Load the end screen scene
             SceneManager.LoadScene("EndScene");
         }
