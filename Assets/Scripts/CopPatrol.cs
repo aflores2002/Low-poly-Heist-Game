@@ -47,6 +47,11 @@ public class CopPatrol : MonoBehaviour
     public AudioClip walkClip;
     public AudioClip runClip;
 
+    [Header("Voice Clips")]
+    public AudioClip gruntClip;
+    public AudioClip confusedClip;
+
+
 
     private float suspicionLevel = 0f;
     private bool hasEscalated = false;
@@ -147,32 +152,52 @@ public class CopPatrol : MonoBehaviour
                     PatrolLogic();
                 }
                 break;
-
-                UpdateFootstepAudio();
         }
+        UpdateFootstepAudio();
+
     }
 
     void UpdateFootstepAudio()
     {
-        float speed = agent.velocity.magnitude;
-        bool isMoving = !agent.isStopped && speed > 0.1f;
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        Debug.Log("Current animation state: " + stateInfo.fullPathHash);
 
-        if (!isMoving || isHit || !animator.GetBool("CanMove"))
+        if (stateInfo.IsName("Walking"))
+        {
+            Debug.Log("Playing walk audio");
+            PlayFootstepClip(walkClip);
+        }
+        else if (stateInfo.IsName("Running"))
+        {
+            Debug.Log("Playing run audio");
+            PlayFootstepClip(runClip);
+        }
+        else
         {
             if (audioSource.isPlaying)
+            {
+                Debug.Log("Stopping audio");
                 audioSource.Stop();
-            return;
+            }
         }
+    }
 
-        AudioClip targetClip = currentState == CopState.Chasing ? runClip : walkClip;
 
-        if (audioSource.clip != targetClip)
+    void PlayFootstepClip(AudioClip clip)
+    {
+        if (audioSource.clip != clip)
         {
-            audioSource.clip = targetClip;
+            audioSource.clip = clip;
             audioSource.loop = true;
             audioSource.Play();
         }
+        else if (!audioSource.isPlaying)
+        {
+            audioSource.Play();
+        }
     }
+
+
 
 
     void StopAgent()
@@ -293,6 +318,8 @@ public class CopPatrol : MonoBehaviour
             if (spot != null && spot.isEmpty && !spot.hasBeenInvestigated && CanSeePoint(spot.transform.position))
             {
                 spot.hasBeenInvestigated = true;
+                PlayVoice(confusedClip); 
+
                 StartCoroutine(InvestigateSpot(spot.transform.position));
                 return true;
             }
@@ -479,6 +506,7 @@ public class CopPatrol : MonoBehaviour
         isHit = true;
         currentState = CopState.Patrol;
 
+
         StopAgent();
         agent.enabled = false;
 
@@ -487,6 +515,9 @@ public class CopPatrol : MonoBehaviour
 
         animator.SetBool("CanMove", false);
         animator.SetTrigger("IsHit");
+
+        PlayVoice(gruntClip);
+
 
         suspicionLevel = suspicionThreshold;
         if (suspicionSlider != null)
@@ -510,10 +541,16 @@ public class CopPatrol : MonoBehaviour
 
         
         StartChase();
-       
-
     }
 
-    
+    void PlayVoice(AudioClip clip)
+    {
+        if (clip != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(clip);
+        }
+    }
+
+
 
 }
