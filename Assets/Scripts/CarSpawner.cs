@@ -41,7 +41,7 @@ public class CarSpawner : MonoBehaviour
     {
         if (carPrefabs == null || carPrefabs.Count == 0)
         {
-            Debug.LogWarning("No car prefabs assigned to the spawner!");
+           // Debug.LogWarning("No car prefabs assigned to the spawner!");
             return;
         }
 
@@ -57,7 +57,7 @@ public class CarSpawner : MonoBehaviour
         CarMovement carMovement = newCar.AddComponent<CarMovement>();
         carMovement.Initialize(carSpeed, despawnTime, movementDirection);
 
-        Debug.Log($"Spawned {newCar.name} at {transform.position}");
+      //  Debug.Log($"Spawned {newCar.name} at {transform.position}");
     }
 
     // Optional: Visualize the spawn point and direction in the editor
