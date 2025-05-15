@@ -43,13 +43,16 @@ public class CopPatrol : MonoBehaviour
     public LayerMask stolenObjectMask;
 
     [Header("Audio")]
-    public AudioSource audioSource;
+    public AudioSource footstepSource;   //  footsteps
+    public AudioSource voiceSource;      //  grunts, confused, etc.
+
     public AudioClip walkClip;
     public AudioClip runClip;
 
     [Header("Voice Clips")]
     public AudioClip gruntClip;
     public AudioClip confusedClip;
+
 
 
 
@@ -164,38 +167,35 @@ public class CopPatrol : MonoBehaviour
 
         if (stateInfo.IsName("Walking"))
         {
-            Debug.Log("Playing walk audio");
             PlayFootstepClip(walkClip);
         }
         else if (stateInfo.IsName("Running"))
         {
-            Debug.Log("Playing run audio");
             PlayFootstepClip(runClip);
         }
         else
         {
-            if (audioSource.isPlaying)
-            {
-                Debug.Log("Stopping audio");
-                audioSource.Stop();
-            }
+            if (footstepSource.isPlaying)
+                footstepSource.Stop();
         }
+
     }
 
 
     void PlayFootstepClip(AudioClip clip)
     {
-        if (audioSource.clip != clip)
+        if (footstepSource.clip != clip)
         {
-            audioSource.clip = clip;
-            audioSource.loop = true;
-            audioSource.Play();
+            footstepSource.clip = clip;
+            footstepSource.loop = true;
+            footstepSource.Play();
         }
-        else if (!audioSource.isPlaying)
+        else if (!footstepSource.isPlaying)
         {
-            audioSource.Play();
+            footstepSource.Play();
         }
     }
+
 
 
 
@@ -516,7 +516,12 @@ public class CopPatrol : MonoBehaviour
         animator.SetBool("CanMove", false);
         animator.SetTrigger("IsHit");
 
-        PlayVoice(gruntClip);
+
+        PlayVoice(gruntClip);               //  Voice plays
+        footstepSource.Stop();             //  Only stop footsteps
+        footstepSource.clip = null;        //  Prevent auto-resume
+
+
 
 
         suspicionLevel = suspicionThreshold;
@@ -545,9 +550,9 @@ public class CopPatrol : MonoBehaviour
 
     void PlayVoice(AudioClip clip)
     {
-        if (clip != null && audioSource != null)
+        if (clip != null && voiceSource != null)
         {
-            audioSource.PlayOneShot(clip);
+            voiceSource.PlayOneShot(clip);
         }
     }
 
