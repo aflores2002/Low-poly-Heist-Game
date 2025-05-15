@@ -16,12 +16,13 @@
 Gameplay emphasizes **immersive interaction**, and **reactive NPC behavior**. Shoppers will panic and freeze in place during the robbery, while police AI will chase the player down. Interactions are initiated via prompts — for example, pressing `E` when looking at a lootable item allows the player to steal it.
 
 We will be incorporating the following X-Factor from the topics learned in this course:
-- **Multiplayer**: We plan to support 2-player cooperative gameplay
-- **Variety of Enemies**: Our enemy system includes police AI with patrolling, and chase states, as well as reactive civilians who panic during the robbery.
+- **Multiplayer Support**: We plan to add 2-player support. (This feature was scratched)
+- **NPC AI**: We plan to include civilian AI as well as driving vehicles to make the city and store more immersive.
+- **Enemy AI**: Our enemy system includes police AI with patrolling, and chase states.
 
 ---
 
 ## Foreseen Challenges
 
-- **Multiplayer Support**: We would like to add two-player co-op once the core gameplay is functional, however, this will most likely be the most challenging part of the game. 
+- **Multiplayer Support**: (Decided not to attempt implementing multiplayer). 
 - **AI Complexity**: Getting police and civilian AI to respond intelligently may require tuning or advanced AI state machines.
