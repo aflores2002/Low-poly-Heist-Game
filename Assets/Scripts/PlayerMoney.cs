@@ -27,6 +27,8 @@ public class PlayerMoney : MonoBehaviour
             popup.transform.localPosition = Vector3.zero; // center in parent
             popup.GetComponent<MoneyPopup>().SetAmount(amount);
         }
+        // Play cash register SFX
+        AudioManager.Instance?.PlayCashRegister();
     }
 
     private void UpdateMoneyUI()

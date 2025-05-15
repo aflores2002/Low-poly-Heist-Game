@@ -3,6 +3,7 @@ using UnityEngine.AI;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 public class CopPatrol : MonoBehaviour
 {
@@ -41,12 +42,27 @@ public class CopPatrol : MonoBehaviour
     public float investigateWaitTime = 2f;
     public LayerMask stolenObjectMask;
 
+    [Header("Audio")]
+    public AudioSource footstepSource;   //  footsteps
+    public AudioSource voiceSource;      //  grunts, confused, etc.
+
+    public AudioClip walkClip;
+    public AudioClip runClip;
+
+    [Header("Voice Clips")]
+    public AudioClip gruntClip;
+    public AudioClip confusedClip;
+
+
+
+
     private float suspicionLevel = 0f;
     private bool hasEscalated = false;
     private bool isInvestigating = false;
     private float lastSeenTime = 0f;
     private Vector3 lastKnownPlayerPosition;
     private bool isSearchingForPlayer = false;
+    private bool isHit = false;
 
     private float viewRadius;
     private float viewAngle;
@@ -56,6 +72,7 @@ public class CopPatrol : MonoBehaviour
 
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
     private static readonly int ChasingHash = Animator.StringToHash("Chasing");
+    private static readonly int LookingHash = Animator.StringToHash("IsLookingAround");
 
     private enum CopState { Patrol, Investigating, Chasing }
     private CopState currentState = CopState.Patrol;
@@ -74,11 +91,47 @@ public class CopPatrol : MonoBehaviour
         viewRadius = minViewRadius;
         viewAngle = minViewAngle;
 
+        currentState = CopState.Patrol;
+
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit navHit, 2f, NavMesh.AllAreas))
+        {
+            agent.Warp(navHit.position);
+        }
+
+        agent.enabled = true;
+        agent.speed = patrolSpeed;
+        agent.isStopped = false;
+
+        animator.SetBool("CanMove", true); // allow movement from the beginning
+
         GoToNextPatrol();
     }
 
     void Update()
     {
+        if (isHit)
+        {
+            StopAgent();
+            return;
+        }
+
+        // Animator-controlled movement
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        bool canMove = animator.GetBool("CanMove");
+        bool isBlocked = stateInfo.IsName("dying") || stateInfo.IsName("getting up");
+
+        if (canMove && !isBlocked && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+        }
+        else
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+
+        animator.SetFloat(SpeedHash, agent.velocity.magnitude);
+
         UpdateSuspicionView();
         UpdateUI();
 
@@ -87,10 +140,8 @@ public class CopPatrol : MonoBehaviour
             case CopState.Chasing:
                 HandleChase();
                 break;
-
             case CopState.Investigating:
                 break;
-
             case CopState.Patrol:
                 if (ShouldChasePlayer())
                 {
@@ -105,6 +156,65 @@ public class CopPatrol : MonoBehaviour
                 }
                 break;
         }
+        UpdateFootstepAudio();
+
+    }
+
+    void UpdateFootstepAudio()
+    {
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        Debug.Log("Current animation state: " + stateInfo.fullPathHash);
+
+        if (stateInfo.IsName("Walking"))
+        {
+            PlayFootstepClip(walkClip);
+        }
+        else if (stateInfo.IsName("Running"))
+        {
+            PlayFootstepClip(runClip);
+        }
+        else
+        {
+            if (footstepSource.isPlaying)
+                footstepSource.Stop();
+        }
+
+    }
+
+
+    void PlayFootstepClip(AudioClip clip)
+    {
+        if (footstepSource.clip != clip)
+        {
+            footstepSource.clip = clip;
+            footstepSource.loop = true;
+            footstepSource.Play();
+        }
+        else if (!footstepSource.isPlaying)
+        {
+            footstepSource.Play();
+        }
+    }
+
+
+
+
+
+    void StopAgent()
+    {
+        if (agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+    }
+
+    void ResumeAgent()
+    {
+        if (agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+        }
     }
 
     void UpdateSuspicionView()
@@ -116,15 +226,27 @@ public class CopPatrol : MonoBehaviour
 
     bool ShouldChasePlayer()
     {
+        // If max suspicion, chase no matter what
+        if (suspicionLevel >= suspicionThreshold)
+            return true;
+
+        // Otherwise, only chase if suspicion exists AND player is visible
         return suspicionLevel > 0 && CanSeePlayer();
     }
 
+
     void StartChase()
     {
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+        {
+            agent.Warp(hit.position);
+        }
         currentState = CopState.Chasing;
         lastSeenTime = Time.time;
         animator.SetBool(ChasingHash, true);
+        animator.SetBool(LookingHash, false);
         agent.speed = chaseSpeed;
+        agent.isStopped = false;
         lastKnownPlayerPosition = player.position;
     }
 
@@ -141,14 +263,12 @@ public class CopPatrol : MonoBehaviour
             isSearchingForPlayer = true;
             StartCoroutine(InvestigateLastSeenPosition());
         }
-
-        animator.SetFloat(SpeedHash, agent.velocity.magnitude);
     }
 
     IEnumerator InvestigateLastSeenPosition()
     {
         agent.SetDestination(lastKnownPlayerPosition);
-        agent.isStopped = false;
+        ResumeAgent();
 
         while (Vector3.Distance(transform.position, lastKnownPlayerPosition) > 1.5f)
         {
@@ -161,8 +281,9 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
-        agent.isStopped = true;
+        StopAgent();
         animator.SetFloat(SpeedHash, 0f);
+        animator.SetBool(LookingHash, true);
 
         float searchTime = 3f;
         float timer = 0f;
@@ -172,6 +293,7 @@ public class CopPatrol : MonoBehaviour
             if (CanSeePlayer())
             {
                 isSearchingForPlayer = false;
+                animator.SetBool(LookingHash, false);
                 StartChase();
                 yield break;
             }
@@ -179,6 +301,7 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
+        animator.SetBool(LookingHash, false);
         isSearchingForPlayer = false;
         currentState = CopState.Patrol;
         animator.SetBool(ChasingHash, false);
@@ -195,6 +318,8 @@ public class CopPatrol : MonoBehaviour
             if (spot != null && spot.isEmpty && !spot.hasBeenInvestigated && CanSeePoint(spot.transform.position))
             {
                 spot.hasBeenInvestigated = true;
+                PlayVoice(confusedClip);
+
                 StartCoroutine(InvestigateSpot(spot.transform.position));
                 return true;
             }
@@ -208,10 +333,9 @@ public class CopPatrol : MonoBehaviour
         currentState = CopState.Investigating;
         isInvestigating = true;
 
-        Vector3 destination = targetPosition;
         if (NavMesh.SamplePosition(targetPosition, out NavMeshHit hit, 2f, NavMesh.AllAreas))
         {
-            destination = hit.position;
+            agent.SetDestination(hit.position);
         }
         else
         {
@@ -221,10 +345,9 @@ public class CopPatrol : MonoBehaviour
             yield break;
         }
 
-        agent.SetDestination(destination);
-        agent.isStopped = false;
+        ResumeAgent();
 
-        while (Vector3.Distance(transform.position, destination) > 1.5f)
+        while (Vector3.Distance(transform.position, hit.position) > 1.5f)
         {
             if (ShouldChasePlayer())
             {
@@ -235,8 +358,8 @@ public class CopPatrol : MonoBehaviour
             yield return null;
         }
 
-        agent.isStopped = true;
-        animator.SetFloat(SpeedHash, 0f);
+        StopAgent();
+        animator.SetBool(LookingHash, true);
 
         float timer = 0f;
         while (timer < investigateWaitTime)
@@ -252,10 +375,12 @@ public class CopPatrol : MonoBehaviour
         }
 
         AlertCop();
+        animator.SetBool(LookingHash, false);
+
         isInvestigating = false;
-        agent.isStopped = false;
-        GoToNextPatrol();
+        ResumeAgent();
         currentState = CopState.Patrol;
+        GoToNextPatrol();
     }
 
     void PatrolLogic()
@@ -264,7 +389,6 @@ public class CopPatrol : MonoBehaviour
 
         agent.speed = patrolSpeed;
         animator.SetBool(ChasingHash, false);
-        animator.SetFloat(SpeedHash, agent.velocity.magnitude);
 
         if (!agent.pathPending && agent.remainingDistance < 0.3f)
         {
@@ -275,7 +399,7 @@ public class CopPatrol : MonoBehaviour
     IEnumerator WaitAtWaypoint()
     {
         isWaiting = true;
-        agent.isStopped = true;
+        StopAgent();
         animator.SetFloat(SpeedHash, 0f);
 
         yield return new WaitForSeconds(waitTimeAtWaypoint);
@@ -287,9 +411,10 @@ public class CopPatrol : MonoBehaviour
 
     void GoToNextPatrol()
     {
-        if (patrolPoints.Length == 0) return;
+        if (patrolPoints.Length == 0 || patrolPoints[currentPoint] == null) return;
 
-        agent.isStopped = false;
+        ResumeAgent();
+        agent.speed = patrolSpeed;
         agent.SetDestination(patrolPoints[currentPoint].position);
     }
 
@@ -352,22 +477,87 @@ public class CopPatrol : MonoBehaviour
         }
     }
 
-    void OnDrawGizmosSelected()
+    void OnTriggerEnter(Collider other)
     {
-        if (player == null) return;
+        if (isHit) return;
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, viewRadius);
+        if (other.CompareTag("Bullet"))
+        {
+            StartCoroutine(HandleKnockdown());
+        }
 
-        Vector3 left = Quaternion.Euler(0, -viewAngle / 2f, 0) * transform.forward;
-        Vector3 right = Quaternion.Euler(0, viewAngle / 2f, 0) * transform.forward;
+        if (currentState == CopState.Chasing && other.CompareTag("Player"))
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            SceneManager.LoadScene("CaughtScene");
 
-        Gizmos.color = Color.blue;
-        Gizmos.DrawLine(transform.position, transform.position + left * viewRadius);
-        Gizmos.DrawLine(transform.position, transform.position + right * viewRadius);
+            PlayerMoney playerMoney = FindObjectOfType<PlayerMoney>();
+            if (playerMoney != null)
+            {
+                PlayerPrefs.SetInt("StolenAmount", playerMoney.currentMoney);
+                PlayerPrefs.Save();
+            }
+        }
+    }
 
-        Gizmos.color = Color.red;
-        Gizmos.DrawSphere(lastKnownPlayerPosition, 0.3f);
+    IEnumerator HandleKnockdown()
+    {
+        isHit = true;
+        currentState = CopState.Patrol;
+
+
+        StopAgent();
+        agent.enabled = false;
+
+        animator.applyRootMotion = false; // Disable root motion for knockdown
+
+
+        animator.SetBool("CanMove", false);
+        animator.SetTrigger("IsHit");
+
+
+        PlayVoice(gruntClip);               //  Voice plays
+        footstepSource.Stop();             //  Only stop footsteps
+        footstepSource.clip = null;        //  Prevent auto-resume
+
+
+
+
+        suspicionLevel = suspicionThreshold;
+        if (suspicionSlider != null)
+            suspicionSlider.value = suspicionLevel;
+
+        yield return new WaitForSeconds(5f); // Dying animation
+
+        animator.SetTrigger("IsGettingUp");
+
+        yield return new WaitForSeconds(1f); // Getting up animation
+
+        agent.enabled = true;
+
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+        {
+            agent.Warp(hit.position);
+        }
+
+        animator.SetBool("CanMove", true);
+        isHit = false;
+
+
+        StartChase();
+    }
+
+    void PlayVoice(AudioClip clip)
+    {
+        if (clip != null && voiceSource != null)
+        {
+            if (clip == confusedClip)
+                voiceSource.volume = 0.05f; // lower just this one
+            else
+                voiceSource.volume = 1f;   // others at full volume
+
+            voiceSource.PlayOneShot(clip);
+        }
     }
 }
-
