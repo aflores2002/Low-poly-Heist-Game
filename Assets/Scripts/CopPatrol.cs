@@ -318,7 +318,7 @@ public class CopPatrol : MonoBehaviour
             if (spot != null && spot.isEmpty && !spot.hasBeenInvestigated && CanSeePoint(spot.transform.position))
             {
                 spot.hasBeenInvestigated = true;
-                PlayVoice(confusedClip); 
+                PlayVoice(confusedClip);
 
                 StartCoroutine(InvestigateSpot(spot.transform.position));
                 return true;
@@ -544,7 +544,7 @@ public class CopPatrol : MonoBehaviour
         animator.SetBool("CanMove", true);
         isHit = false;
 
-        
+
         StartChase();
     }
 
@@ -552,10 +552,12 @@ public class CopPatrol : MonoBehaviour
     {
         if (clip != null && voiceSource != null)
         {
+            if (clip == confusedClip)
+                voiceSource.volume = 0.05f; // lower just this one
+            else
+                voiceSource.volume = 1f;   // others at full volume
+
             voiceSource.PlayOneShot(clip);
         }
     }
-
-
-
 }
